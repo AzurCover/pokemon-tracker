@@ -182,6 +182,22 @@ Le scellé (display, ETB, booster, coffret) **est écarté** : ça ne passe pas 
 trieur. Le rejet n'a lieu que si le titre ne chiffre aucune carte, pour qu'un vrai vrac
 qui mentionne un booster en cadeau (« 3000 cartes + 1 booster scellé offert ») reste pris.
 
+## L'historique des prix
+
+Chaque passage ajoute à `history.jsonl` une ligne par annonce **inédite ou dont le prix
+a bougé** — annonces rejetées comprises, parce qu'une référence de prix a besoin de la
+distribution entière, pas de la sélection. Une annonce revue au même prix n'écrit rien.
+
+Pourquoi : aucune source licenciable ne donne le prix réel du marché français. Cardmarket
+publie bien un Price Guide téléchargeable, mais **sur le scellé ses moyennes de ventes
+réelles (`avg7`/`avg30`) sont vides à 100 %** — il ne reste qu'une estimation, incohérente
+sur un produit sur sept. Et l'API eBay des prix vendus est fermée aux nouveaux comptes.
+Ce journal est donc le seul moyen de s'en constituer une.
+
+`--reset` n'y touche pas : il n'efface que `seen.json`. Le fichier n'est pas versionné et
+n'existe que sur cette machine — **c'est lui qu'il faut sauvegarder**, sa valeur ne vient
+que de son ancienneté.
+
 ## Autres pistes non branchées
 
 | Site | État |

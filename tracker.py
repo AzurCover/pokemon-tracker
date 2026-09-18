@@ -13,6 +13,7 @@ from datetime import datetime
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import ebay  # noqa: E402
 import ebay_api  # noqa: E402
+import history  # noqa: E402
 import leboncoin  # noqa: E402
 import score as scoring  # noqa: E402
 import telegram  # noqa: E402
@@ -291,6 +292,10 @@ def main():
     for it in raw:
         scoring.analyse(it, cfg)
         (kept if scoring.passes(it, cfg) else rejected).append(it)
+
+    logged = history.record(raw)
+    if logged:
+        print("%d ligne(s) ajoutée(s) à l'historique des prix" % logged)
 
     kept.sort(key=lambda x: (-x["score"], x.get("price_per_card") or 9e9))
     kept = kept[: cfg.get("top_n", 80)]

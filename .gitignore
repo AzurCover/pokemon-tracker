@@ -6,3 +6,6 @@ run.log
 telegram.json
 bot.log
 telegram.json.tmp
+history.jsonl
+history_index.json
+history_index.json.tmp
