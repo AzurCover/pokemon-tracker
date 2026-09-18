@@ -41,6 +41,8 @@ def extract_card_count(title):
     return None, None
 
 
+SEALED = r"\bdisplay\b|\bbooster\b|\bscell[ée]e?s?\b|\bsealed\b|\betb\b|\bcoffret\b"
+
 # Signaux de valeur valables quel que soit le jeu.
 COMMON_GEMS = [
     (r"\bvintage\b|\bretro\b|\bancienne?s?\b|\bold\b", 3, "vintage"),
@@ -49,7 +51,7 @@ COMMON_GEMS = [
     (r"\bholo(graphique)?s?\b|\bbrillantes?\b|\bshiny\b|\bfoils?\b|\bpremiums?\b", 2, "holo/foil"),
     (r"\brares?\b", 1, "rares"),
     # le scellé est un autre hobby : il ne passe pas dans le trieur, donc poids nul
-    (r"\bdisplay\b|\bbooster\b|\bscell[ée]e?s?\b|\bsealed\b|\betb\b|\bcoffret\b", 0, "scellé (pas du vrac)"),
+    (SEALED, 0, "scellé (pas du vrac)"),
 ]
 
 GAMES = {
@@ -247,6 +249,12 @@ def passes(item, cfg):
 
     if cfg.get("reject_red_flags", True) and item.get("flags"):
         item["_reject"] = "red flag: %s" % ", ".join(item["flags"])
+        return False
+
+    # Le scellé ne passe pas dans le trieur. On ne l'écarte que faute de nombre
+    # de cartes : "3000 cartes + un booster scellé" reste un vrac légitime.
+    if item.get("cards") is None and re.search(SEALED, t):
+        item["_reject"] = "scellé (pas du vrac)"
         return False
 
     total = item.get("total")

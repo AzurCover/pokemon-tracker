@@ -171,8 +171,9 @@ donc des **indices de volume** prennent le relais : vrac +4, milliers +4, gros l
 carton/caisse +3, collection entière +3, classeur rempli +3, communes/doubles +2.
 Les contenants vides (top loader, « 252 emplacements ») sont écartés.
 
-Le scellé (display, ETB, booster) est volontairement à **poids nul** : ça ne passe pas
-dans le trieur.
+Le scellé (display, ETB, booster, coffret) **est écarté** : ça ne passe pas dans le
+trieur. Le rejet n'a lieu que si le titre ne chiffre aucune carte, pour qu'un vrai vrac
+qui mentionne un booster en cadeau (« 3000 cartes + 1 booster scellé offert ») reste pris.
 
 ## Autres pistes non branchées
 
