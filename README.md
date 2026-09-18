@@ -59,20 +59,39 @@ Par passage, seules les 8 meilleures nouveautés partent en message (réglable v
 ### Partager le bot
 
 ```bash
-python3 tracker.py --telegram-invite      # affiche le lien + la liste des abonnés
+python3 tracker.py --telegram-share            # lien, mot de passe, abonnés
+python3 tracker.py --telegram-password secret  # changer le mot de passe
 ```
 
-Le lien contient un code secret (`?start=…`). Qui l'ouvre et appuie sur **Démarrer**
-est abonné au passage suivant du tracker et reçoit ensuite les mêmes annonces que toi.
-Sans ce code, un inconnu qui tombe sur le bot se fait poliment éconduire — le bot est
-public par nature, seul l'abonnement est filtré. `/stop` désabonne.
+Tu envoies le lien **et** le mot de passe. La personne ouvre le bot, tape le mot de
+passe, et choisit tout de suite les jeux qu'elle veut suivre avec trois boutons
+(Pokémon / Magic / Yu-Gi-Oh). Chacun ne reçoit que ce qu'il a coché ; `/jeux` permet
+d'en changer à tout moment, `/stop` de se désabonner.
 
-**Ne partage jamais le token**, seulement ce lien : le token donne le contrôle total
+Un bot Telegram est public par nature : n'importe qui tombant sur `@ton_bot` peut lui
+écrire. C'est le mot de passe qui filtre, pas l'obscurité du lien. Au bout de 5 essais
+ratés, l'importun est ignoré pendant une heure, et le message contenant le mot de passe
+est effacé de la conversation une fois validé.
+
+**Ne partage jamais le token**, seulement le lien : le token donne le contrôle total
 du bot. S'il fuite, `/revoke` dans @BotFather en génère un nouveau.
 
-L'apparence du bot (nom, description, commandes) est posée par `telegram.describe()`.
-La photo de profil, elle, n'est pas modifiable par l'API : elle passe obligatoirement
-par @BotFather → *Edit Bot* → *Edit Botpic*, avec `bot-logo.png`.
+Les réponses doivent être immédiates, alors qu'un passage du tracker n'a lieu que
+toutes les 10 minutes : l'écoute vit donc dans un **processus séparé** (`bot.py`,
+LaunchAgent `com.maxence.pokemon-bot`, relancé automatiquement s'il tombe).
+
+```bash
+launchctl list | grep pokemon-bot   # doit afficher un PID
+tail -f bot.log                     # abonnements et désabonnements en direct
+```
+
+C'est aussi le seul processus autorisé à lire les messages : deux programmes qui
+appellent `getUpdates` en même temps se volent les messages l'un à l'autre.
+
+L'apparence du bot (nom, description, commandes) est posée par `telegram.describe()`,
+appelée au démarrage de `bot.py`. La photo de profil, elle, n'est pas modifiable par
+l'API : elle passe obligatoirement par @BotFather → *Edit Bot* → *Edit Botpic*, avec
+`bot-logo.png`.
 
 ## 4. Régler les filtres
 

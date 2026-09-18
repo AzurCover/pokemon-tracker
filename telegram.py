@@ -20,8 +20,11 @@ def load_state():
 
 
 def save_state(state):
-    with open(CREDS, "w", encoding="utf-8") as fh:
+    # écriture atomique : bot.py écrit pendant que tracker.py lit
+    tmp = CREDS + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
         json.dump(state, fh, indent=1, ensure_ascii=False)
+    os.replace(tmp, CREDS)
 
 
 def get_credentials():
@@ -35,14 +38,20 @@ def get_credentials():
     return token, chat
 
 
+ALL_GAMES = ["pokemon", "magic", "yugioh"]
+GAME_LABELS = {"pokemon": "Pokémon", "magic": "Magic", "yugioh": "Yu-Gi-Oh"}
+
+
 def recipients():
-    """(chat_id, nom) du propriétaire puis des invités."""
+    """(chat_id, nom, jeux suivis) du propriétaire puis des invités."""
+    state = load_state()
     token, owner = get_credentials()
-    out = [(owner, "toi")] if owner else []
-    for sub in load_state().get("subscribers") or []:
+    out = [(owner, "toi", state.get("games") or ALL_GAMES)] if owner else []
+    for sub in state.get("subscribers") or []:
         cid = str(sub.get("id") or "")
         if cid and cid != owner:
-            out.append((cid, sub.get("name") or "invité"))
+            out.append((cid, sub.get("name") or "invité",
+                        sub.get("games") or ALL_GAMES))
     return out
 
 
@@ -51,7 +60,32 @@ def available():
     return bool(token and chat)
 
 
-def call(method, payload, token=None):
+def get_password(create=True):
+    """Mot de passe d'accès au bot, tiré au sort au premier appel."""
+    state = load_state()
+    if not state:
+        return None
+    pwd = state.get("password")
+    if not pwd and create:
+        pwd = "cartes-%04d" % secrets.randbelow(10000)
+        state["password"] = pwd
+        save_state(state)
+    return pwd
+
+
+def set_password(pwd):
+    state = load_state()
+    state["password"] = pwd.strip()
+    save_state(state)
+    return state["password"]
+
+
+def bot_link(token=None):
+    username = (call("getMe", {}, token).get("result") or {}).get("username", "")
+    return "https://t.me/%s" % username
+
+
+def call(method, payload, token=None, timeout=20):
     token = token or get_credentials()[0]
     if not token:
         raise RuntimeError("aucun bot_token Telegram")
@@ -61,7 +95,7 @@ def call(method, payload, token=None):
         headers={"Content-Type": "application/json"},
     )
     try:
-        with urllib.request.urlopen(req, timeout=20) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
             return json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")[:200]
@@ -134,7 +168,9 @@ def send_batch(items, limit=8, delay=1.2):
     sent = 0
     for it in items[:limit]:
         delivered = False
-        for cid, who in targets:
+        for cid, who, games in targets:
+            if it.get("game") not in games:
+                continue
             try:
                 send_item(it, token, cid)
                 delivered = True
@@ -145,7 +181,7 @@ def send_batch(items, limit=8, delay=1.2):
 
     rest = len(items) - sent
     if sent and rest > 0:
-        for cid, _who in targets:
+        for cid, _who, _games in targets:
             try:
                 call("sendMessage", {
                     "chat_id": cid,
@@ -155,101 +191,6 @@ def send_batch(items, limit=8, delay=1.2):
             except Exception:  # noqa: BLE001
                 pass
     return sent
-
-
-WELCOME = ("<b>C'est bon, tu es abonné.</b>\n\n"
-           "Tu recevras ici chaque nouveau gros lot de cartes repéré sur eBay et "
-           "Leboncoin : prix par carte, nombre de cartes, indices de pépite et le "
-           "lien direct vers l'annonce.\n\n"
-           "<i>/stop à tout moment pour ne plus rien recevoir.</i>")
-
-
-def _reply(token, chat_id, text):
-    try:
-        call("sendMessage", {"chat_id": chat_id, "text": text,
-                             "parse_mode": "HTML"}, token)
-    except Exception:  # noqa: BLE001
-        pass
-
-
-def invite_link(token=None):
-    """Lien d'invitation personnel, créé au premier appel."""
-    state = load_state()
-    if not state:
-        return None
-    code = state.get("invite_code")
-    if not code:
-        code = "".join(c for c in secrets.token_urlsafe(12) if c.isalnum())[:12]
-        state["invite_code"] = code
-        save_state(state)
-    token = token or state.get("bot_token")
-    username = (call("getMe", {}, token).get("result") or {}).get("username", "")
-    return "https://t.me/%s?start=%s" % (username, code)
-
-
-def sync_subscribers():
-    """Traite les /start et /stop reçus depuis le dernier passage.
-
-    Volontairement réservé à la machine qui détient telegram.json : deux
-    runtimes qui appelleraient getUpdates se voleraient les messages.
-    """
-    state = load_state()
-    token = str(state.get("bot_token") or "").strip()
-    if not token:
-        return []
-
-    payload = {"timeout": 0, "limit": 50, "allowed_updates": ["message"]}
-    if state.get("offset"):
-        payload["offset"] = state["offset"]
-    try:
-        res = call("getUpdates", payload, token)
-    except RuntimeError as exc:
-        print("  ! Telegram getUpdates : %s" % exc)
-        return []
-
-    owner = str(state.get("chat_id") or "")
-    subs = list(state.get("subscribers") or [])
-    known = {str(s.get("id")) for s in subs}
-    code = state.get("invite_code") or ""
-    events = []
-
-    updates = res.get("result") or []
-    for upd in updates:
-        state["offset"] = upd["update_id"] + 1
-        msg = upd.get("message") or {}
-        chat = msg.get("chat") or {}
-        cid = str(chat.get("id") or "")
-        text = (msg.get("text") or "").strip()
-        if not cid or not text.startswith("/"):
-            continue
-
-        name = chat.get("first_name") or chat.get("title") or "invité"
-        cmd, _, arg = text.partition(" ")
-        cmd = cmd.split("@")[0].lower()
-
-        if cmd == "/stop":
-            if cid in known:
-                subs = [s for s in subs if str(s.get("id")) != cid]
-                known.discard(cid)
-                events.append("− %s s'est désabonné" % name)
-            _reply(token, cid, "Très bien, je n'envoie plus rien. "
-                               "<i>/start pour revenir.</i>")
-        elif cmd == "/start":
-            if cid == owner or cid in known:
-                _reply(token, cid, "Tu es déjà abonné. <i>/stop pour arrêter.</i>")
-            elif code and arg.strip() == code:
-                subs.append({"id": cid, "name": name})
-                known.add(cid)
-                events.append("+ %s vient de s'abonner" % name)
-                _reply(token, cid, WELCOME)
-            else:
-                _reply(token, cid, "Ce bot est privé. Demande son lien "
-                                   "d'invitation à la personne qui te l'a fait connaître.")
-
-    if updates:
-        state["subscribers"] = subs
-        save_state(state)
-    return events
 
 
 def describe():
@@ -268,6 +209,7 @@ def describe():
          "Pokémon · Magic · Yu-Gi-Oh vintage"}, token)
     call("setMyCommands", {"commands": [
         {"command": "start", "description": "recevoir les annonces"},
+        {"command": "jeux", "description": "choisir Pokémon, Magic, Yu-Gi-Oh"},
         {"command": "stop", "description": "ne plus rien recevoir"},
     ]}, token)
 

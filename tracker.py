@@ -237,23 +237,29 @@ def main():
                     choices=["ebay", "leboncoin"], help="limiter aux sources choisies")
     ap.add_argument("--telegram-setup", action="store_true",
                     help="appairer le bot Telegram puis quitter")
-    ap.add_argument("--telegram-invite", action="store_true",
-                    help="afficher le lien d'invitation à partager")
+    ap.add_argument("--telegram-share", action="store_true",
+                    help="afficher le lien du bot, le mot de passe et les abonnés")
+    ap.add_argument("--telegram-password", metavar="MDP",
+                    help="changer le mot de passe d'accès au bot")
     args = ap.parse_args()
 
     if args.telegram_setup:
         telegram.setup()
         return
 
-    if args.telegram_invite:
-        link = telegram.invite_link()
-        if not link:
+    if args.telegram_password:
+        print("Mot de passe : %s" % telegram.set_password(args.telegram_password))
+        return
+
+    if args.telegram_share:
+        pwd = telegram.get_password()
+        if not pwd:
             print("Bot non appairé : lance d'abord --telegram-setup")
             return
-        print("\nLien d'invitation (à envoyer à la personne de ton choix) :\n")
-        print("  %s\n" % link)
-        for cid, who in telegram.recipients():
-            print("  abonné : %s (%s)" % (who, cid))
+        print("\n  Lien           %s" % telegram.bot_link())
+        print("  Mot de passe   %s\n" % pwd)
+        for cid, who, games in telegram.recipients():
+            print("  abonné : %-8s %-12s %s" % (who, cid, ", ".join(games)))
         return
 
     cfg = load_json(CONFIG, {})
@@ -314,10 +320,6 @@ def main():
     save_json(SEEN, seen)
 
     fresh = [it for it in kept if it["id"] in new_ids]
-    if not args.no_notify and telegram.available():
-        for event in telegram.sync_subscribers():
-            print("Telegram : %s" % event)
-
     if fresh and not args.no_notify:
         if cfg.get("notify", True):
             notify(len(fresh), fresh[0]["title"])
