@@ -31,4 +31,9 @@ jobs:
           EBAY_CLIENT_SECRET: ${{ secrets.EBAY_CLIENT_SECRET }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python3 tracker.py --source ebay --pages 1
+        run: |
+          if [ -z "$EBAY_CLIENT_ID" ]; then
+            echo "::error::Secrets EBAY_CLIENT_ID / EBAY_CLIENT_SECRET absents."
+            exit 1
+          fi
+          python3 tracker.py --source ebay --pages 1
