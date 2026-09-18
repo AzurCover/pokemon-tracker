@@ -51,7 +51,10 @@ def esc(text):
 
 
 def caption(it):
-    lines = ["<b>%s</b>" % esc((it.get("title") or "")[:180])]
+    lines = []
+    if it.get("premium"):
+        lines.append("🔥 <b>PÉPITE VINTAGE</b>")
+    lines.append("<b>%s</b>" % esc((it.get("title") or "")[:180]))
 
     money = []
     if it.get("total"):

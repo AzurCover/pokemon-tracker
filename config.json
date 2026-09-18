@@ -18,7 +18,9 @@
       "gros lot cartes magic",
       "vrac cartes magic",
       "collection cartes magic mtg",
-      "lot cartes magic anciennes"
+      "lot cartes magic anciennes",
+      "lot cartes yu-gi-oh 1ere edition",
+      "lot yu-gi-oh ancien"
     ],
     "leboncoin": [
       "lot cartes pokemon",
@@ -30,7 +32,9 @@
       "lot cartes magic",
       "vrac cartes magic",
       "collection cartes magic mtg",
-      "carton cartes magic"
+      "carton cartes magic",
+      "lot cartes yu-gi-oh",
+      "cartes yu-gi-oh anciennes"
     ]
   },
   "pages": 2,
@@ -43,6 +47,7 @@
   "keep_unknown_count": true,
   "require_bulk_hint_when_unknown": true,
   "max_price_per_card": 0.5,
+  "premium_gem_score": 12,
   "min_score": 4,
   "reject_red_flags": true,
   "exclude_keywords": [
@@ -58,6 +63,7 @@
   "delay_between_queries": 2.5,
   "games": [
     "pokemon",
-    "magic"
+    "magic",
+    "yugioh"
   ]
 }

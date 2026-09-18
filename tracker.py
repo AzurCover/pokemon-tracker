@@ -118,6 +118,8 @@ def render_html(items, new_ids, cfg):
             badges.append('<span class="b new">NOUVEAU</span>')
         if it.get("game"):
             badges.append('<span class="b game %s">%s</span>' % (it["game"], it["game"].upper()))
+        if it.get("premium"):
+            badges.append('<span class="b premium">PÉPITE</span>')
         if it.get("cards"):
             src = it.get("cards_origin")
             label = "%d cartes" % it["cards"]
@@ -195,6 +197,8 @@ h1 {{ font-size:22px; margin:0 0 4px; }}
 .b.game {{ font-weight:700; letter-spacing:.4px; }}
 .b.game.pokemon {{ background:#3a2f12; color:#ffd166; }}
 .b.game.magic {{ background:#2a1f38; color:#c39bff; }}
+.b.game.yugioh {{ background:#38241a; color:#ffa07a; }}
+.b.premium {{ background:#ffb454; color:#12141a; font-weight:700; letter-spacing:.4px; }}
 .src {{ font-weight:700; letter-spacing:.3px; }}
 .src.leboncoin {{ color:#ff6e40; }}
 .src.ebay {{ color:#7aa2f7; }}

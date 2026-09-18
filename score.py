@@ -80,14 +80,34 @@ GAMES = {
             (r"\bcommander\b|\bedh\b|\blegacy\b|\bmodern\b", 1, "commander/legacy"),
         ],
     },
+    "yugioh": {
+        "match": r"\byu.?gi.?oh?\b|\bygo\b",
+        # Konami réimprime sans limite et la banlist efface la cote : le vrac
+        # Yu-Gi-Oh moderne ne vaut rien, même en rares. Seul le vintage se trie.
+        "require": (r"1[eè]?re?\s*[ée]dition|\b1st\s*ed(ition)?\b|\blob\b|\bmrd\b|\bmrl\b|\bpsv\b|"
+                    r"legend of blue.?eyes|metal raiders|magic ruler|pharaoh'?s servant|"
+                    r"labyrinth of nightmare|\b200[2-5]\b|\bvintage\b|\bretro\b|\bancienne?s?\b"),
+        "gems": [
+            (r"\blob\b|legend of blue.?eyes", 6, "LOB"),
+            (r"\bmrd\b|\bmrl\b|\bpsv\b|metal raiders|magic ruler|pharaoh'?s servant|labyrinth of nightmare", 5, "sets 2002-03"),
+            (r"1[eè]?re?\s*[ée]dition|\b1st\s*ed(ition)?\b", 5, "1ère édition"),
+            (r"\b200[2-5]\b", 4, "années 2002-05"),
+            (r"ghost rare|ultimate rare|secrete?s? rares?|\bparallel\b", 3, "haute rareté"),
+            (r"blue.?eyes|dragon blanc|magicien sombre|dark magician|\bexodia\b", 3, "cartes iconiques"),
+        ],
+    },
 }
 
 
 def detect_game(t, cfg):
+    """Premier jeu suivi que le titre mentionne, et dont il remplit la condition."""
     for name in cfg.get("games") or ["pokemon"]:
         spec = GAMES.get(name)
-        if spec and re.search(spec["match"], t):
-            return name
+        if not spec or not re.search(spec["match"], t):
+            continue
+        if spec.get("require") and not re.search(spec["require"], t):
+            continue
+        return name
     return None
 
 # Indices de gros volume quand le titre ne chiffre pas les cartes.
@@ -104,6 +124,12 @@ BULK_HINTS = [
     (r"\bdoubles?\b|\bcommunes?\b|\bbulk\b", 2, "communes/doubles"),
 ]
 
+# Le passe-droit "pépite" ne vaut que pour un lot : une belle carte seule, même
+# gradée 1ère édition, n'a pas d'intérêt ici puisqu'elle ne se trie pas.
+LOT_CONTEXT = (r"\blots?\b|\bcollections?\b|\bvracs?\b|\bensembles?\b|\bclasseurs?\b|"
+               r"\bcartons?\b|\bstocks?\b|\balbums?\b|\bbinders?\b|\bportfolios?\b|"
+               r"\bpaquets?\b|\bcaisses?\b|\bboites? pleines?\b")
+
 RED_FLAGS = [
     (r"\bfakes?\b|\bfaux\b|\bcontrefa[çc]on\b|\bcounterfeit\b", "contrefaçon"),
     (r"\bproxy(s|ies)?\b|\borica\b|\bcustom\b|\bfanmade\b|fan ?art", "proxy/custom"),
@@ -115,6 +141,10 @@ RED_FLAGS = [
     (r"feuilles?\s+(de\s+)?(classeur|protection|rangement)|(protection|rangement)s?\s+(de\s+)?cartes|\bpochettes?\b",
      "accessoire de rangement"),
 ]
+
+
+ACCESSORY_BRAND = r"\bultra ?pro\b|\bdragon ?shield\b|\bgamegenic\b|\bultimate ?guard\b|\bexacompta\b"
+CONTAINER = r"\bclasseurs?\b|\bbinders?\b|\bportfolios?\b|\balbums?\b|\bpochettes?\b|\bsleeves?\b|\bboites?\b"
 
 
 def analyse(item, cfg):
@@ -144,6 +174,12 @@ def analyse(item, cfg):
             score += weight
             gems.append(label)
 
+    # Score des seuls indices de pépite, avant tout bonus de volume ou de prix :
+    # c'est lui qui décide si l'annonce mérite d'échapper aux filtres de volume.
+    item["gem_score"] = score
+    item["premium"] = (score >= cfg.get("premium_gem_score", 12)
+                       and bool(count or re.search(LOT_CONTEXT, t)))
+
     bulk = []
     for pat, weight, label in BULK_HINTS:
         if re.search(pat, t):
@@ -152,6 +188,13 @@ def analyse(item, cfg):
     item["bulk"] = bulk
 
     flags = [label for pat, label in RED_FLAGS if re.search(pat, t)]
+
+    # "Album Ultra PRO ... 480 cartes" vend le classeur : le nombre annoncé est
+    # une capacité, pas un contenu. On ne jette que si rien d'autre ne signale
+    # des cartes en vrac, pour ne pas perdre un vrai lot livré avec son classeur.
+    if (re.search(ACCESSORY_BRAND, t) and re.search(CONTAINER, t)
+            and not re.search(r"\bvracs?\b|\bdoubles?\b|\bcommunes?\b", t)):
+        flags.append("classeur de marque (contenant)")
 
     # bonus volume
     if count:
@@ -217,9 +260,14 @@ def passes(item, cfg):
             item["_reject"] = "trop cher (%.2f)" % total
             return False
 
+    # Un faisceau d'indices vintage exceptionnel (dual lands liste réservée,
+    # LOB 1ère édition...) vaut plus qu'un gros volume : ces annonces ne
+    # chiffrent presque jamais leurs cartes et se feraient jeter sans ça.
+    premium = item.get("premium")
+
     count = item.get("cards")
     min_cards = cfg.get("min_cards", 0)
-    if min_cards:
+    if min_cards and not premium:
         if count is None:
             if not cfg.get("keep_unknown_count", True):
                 item["_reject"] = "nombre de cartes inconnu"
@@ -236,7 +284,7 @@ def passes(item, cfg):
 
     max_ppc = cfg.get("max_price_per_card")
     ppc = item.get("price_per_card")
-    if max_ppc and ppc is not None and not item.get("auction") and ppc > max_ppc:
+    if max_ppc and ppc is not None and not item.get("auction") and not premium and ppc > max_ppc:
         item["_reject"] = "%.3f EUR/carte" % ppc
         return False
 

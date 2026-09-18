@@ -1,4 +1,4 @@
-# Tracker multi-sites — gros lots de cartes Pokémon & Magic
+# Tracker multi-sites — gros lots de cartes Pokémon, Magic & Yu-Gi-Oh
 
 Sources actives : **eBay** (API) et **Leboncoin** (fonctionne sans clé).
 
@@ -64,11 +64,12 @@ Tout est dans `config.json` :
 |---|---|
 | `sources` | `["ebay", "leboncoin"]` |
 | `queries` | les recherches, par source |
-| `games` | jeux surveillés : `["pokemon", "magic"]` — une annonce qui n'en mentionne aucun est écartée |
+| `games` | jeux surveillés : `["pokemon", "magic", "yugioh"]` — une annonce qui n'en mentionne aucun est écartée |
 | `require_bulk_hint_when_unknown` | sans nombre de cartes, exiger un indice de volume |
 | `min_cards` | nombre de cartes minimum (défaut 100) |
 | `min_total` / `max_total` | fourchette de prix en € (port inclus) |
 | `max_price_per_card` | plafond €/carte (défaut 0.50) |
+| `premium_gem_score` | score d'indices vintage à partir duquel une annonce échappe aux filtres de volume (défaut 12) |
 | `min_score` | sévérité du tri (monte-le si trop de bruit) |
 | `exclude_keywords` | mots qui disqualifient une annonce |
 | `keep_unknown_count` | garder les annonces sans nombre de cartes lisible |
@@ -76,6 +77,15 @@ Tout est dans `config.json` :
 
 **Les enchères échappent aux planchers de prix** : un lot de 1000 cartes qui démarre à
 1 € serait sinon éliminé, alors que c'est exactement la bonne affaire à surveiller.
+
+**Les annonces « pépite » échappent aux filtres de volume.** Quand les seuls indices de
+pépite d'un titre totalisent `premium_gem_score` ou plus — « dual lands liste réservée
+1994 » (14), « Yu-Gi-Oh 1ère édition LOB 2002 » (18) — ni `min_cards` ni le plafond
+€/carte ne s'appliquent : sur ce segment le vendeur ne chiffre jamais ses cartes, et
+ces annonces se faisaient jeter faute de volume annoncé. Le plafond `max_total`, les
+mots exclus et les signaux douteux, eux, continuent de s'appliquer. Le passe-droit
+exige un contexte de lot (lot, vrac, collection, classeur… ou un nombre de cartes) :
+une belle carte seule, même gradée 1ère édition, ne se trie pas et reste écartée.
 
 ## 5. Automatiser
 
@@ -106,7 +116,16 @@ une IP résidentielle, donc une machine à la maison.
 - **Pépites Pokémon** : Wizards/WOTC +5, 1ère édition +5, 1996-2003 +4, set vintage +4, GX/VMAX +2
 - **Pépites Magic** : liste réservée/duales +6, Alpha/Beta/P9 +6, sets 1993-95 +5,
   Revised +4, années 90 +4, fetch/shocklands +3
-- **Pénalités** : −4 par signal douteux (contrefaçon, proxy, custom, cartes code, stickers)
+- **Pépites Yu-Gi-Oh** : LOB +6, sets 2002-03 +5, 1ère édition +5, années 2002-05 +4,
+  haute rareté +3, cartes iconiques +3
+- **Pénalités** : −4 par signal douteux (contrefaçon, proxy, custom, cartes code, stickers,
+  accessoires de rangement, classeurs de marque type Ultra Pro)
+
+**Yu-Gi-Oh n'est suivi qu'en vintage.** Konami réimprime sans limite et la banlist
+efface la cote d'une carte du jour au lendemain : le vrac moderne ne vaut rien, même
+en rares. Une annonce Yu-Gi-Oh doit donc mentionner un set 2002-05, une 1ère édition
+ou « ancien/vintage » pour être seulement prise en compte. Pokémon et Magic n'ont pas
+cette condition d'entrée : leur vrac récent garde une valeur de revente.
 
 Le poids en kg est converti en cartes (~600 cartes/kg) quand le titre annonce « 2 kg de cartes ».
 
