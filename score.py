@@ -41,24 +41,54 @@ def extract_card_count(title):
     return None, None
 
 
-GEM_KEYWORDS = [
-    # vintage / haute valeur
-    (r"\bwizards?\b|\bwotc\b", 5, "Wizards/WOTC"),
-    (r"1[eè]?re?\s*[ée]dition|\bedition\s*1\b|\b1ed\b|\bfirst edition\b", 5, "1ère édition"),
-    (r"\b(199[6-9]|200[0-3])\b", 4, "années 90/2000"),
-    (r"set de base|base set|\bfossile\b|\bfossil\b|\bjungle\b|\bneo\b|team rocket", 4, "set vintage"),
+# Signaux de valeur valables quel que soit le jeu.
+COMMON_GEMS = [
     (r"\bvintage\b|\bretro\b|\bancienne?s?\b|\bold\b", 3, "vintage"),
     (r"\bgrenier\b|\bsuccession\b|\bheritage\b|\bdebarras\b|collection perso", 3, "grenier/succession"),
-    # cartes à valeur
     (r"\bpsa\b|\bpca\b|\bgrad[ée]e?s?\b|\bbgs\b", 3, "gradée"),
-    (r"\bholo(graphique)?s?\b|\bbrillantes?\b|\bshiny\b", 2, "holo"),
-    (r"\bex\b|\bgx\b|\bvmax\b|\bvstar\b|\bmega\b|\bprime\b|\blv\.?\s*x\b", 2, "cartes EX/GX"),
-    (r"\bsecrete?s?\b|\brainbow\b|\bfull ?art\b|\balt(ernative)? ?art\b", 2, "full art/secrète"),
-    (r"\bjapon(ais|aise)?e?s?\b|\bjapan(ese)?\b", 1, "japonais"),
+    (r"\bholo(graphique)?s?\b|\bbrillantes?\b|\bshiny\b|\bfoils?\b|\bpremiums?\b", 2, "holo/foil"),
     (r"\brares?\b", 1, "rares"),
-    # scellé = un autre hobby : ça n'alimente pas le trieur, donc poids nul
+    # le scellé est un autre hobby : il ne passe pas dans le trieur, donc poids nul
     (r"\bdisplay\b|\bbooster\b|\bscell[ée]e?s?\b|\bsealed\b|\betb\b|\bcoffret\b", 0, "scellé (pas du vrac)"),
 ]
+
+GAMES = {
+    "pokemon": {
+        "match": r"\bpokemon\b|\bptcg\b",
+        "gems": [
+            (r"\bwizards?\b|\bwotc\b", 5, "Wizards/WOTC"),
+            (r"1[eè]?re?\s*[ée]dition|\bedition\s*1\b|\b1ed\b|\bfirst edition\b", 5, "1ère édition"),
+            (r"\b(199[6-9]|200[0-3])\b", 4, "années 90/2000"),
+            (r"set de base|base set|\bfossile\b|\bfossil\b|\bjungle\b|\bneo\b|team rocket", 4, "set vintage"),
+            (r"\bgx\b|\bvmax\b|\bvstar\b|\bprime\b|\blv\.?\s*x\b", 2, "cartes GX/VMAX"),
+            (r"\bsecrete?s?\b|\brainbow\b|\bfull ?art\b|\balt(ernative)? ?art\b", 2, "full art/secrète"),
+            (r"\bjapon(ais|aise)?e?s?\b|\bjapan(ese)?\b", 1, "japonais"),
+        ],
+    },
+    "magic": {
+        "match": r"\bmagic\b|\bmtg\b|\bgathering\b|l'?assemblee",
+        "gems": [
+            # la liste réservée ne sera jamais réimprimée : c'est là qu'est l'argent
+            (r"liste reservee|reserved list|\bdual ?lands?\b|\bduales?\b", 6, "liste réservée/duales"),
+            (r"\balpha\b|\bbeta\b|\bunlimited\b|black lotus|\bmox\b|power nine|\bp9\b", 6, "Alpha/Beta/P9"),
+            (r"\blegends\b|antiquities|arabian nights|the dark|fallen empires", 5, "sets 1993-95"),
+            (r"\brevised\b|revis[ée]e?\b|\b[34]\s*e(me)?\s*[ée]dition\b", 4, "Revised/4e"),
+            (r"\b199[3-9]\b", 4, "années 90"),
+            (r"ice age|\bmirage\b|\btempest\b|\bexodus\b|\burza\b|\bvisions\b|\bstronghold\b|\bsaga\b", 3, "sets vintage"),
+            (r"\bfetch ?lands?\b|\bshock ?lands?\b|\bterrains? rares?\b", 3, "fetch/shocklands"),
+            (r"\bmythiques?\b|\bmythics?\b", 1, "mythiques"),
+            (r"\bcommander\b|\bedh\b|\blegacy\b|\bmodern\b", 1, "commander/legacy"),
+        ],
+    },
+}
+
+
+def detect_game(t, cfg):
+    for name in cfg.get("games") or ["pokemon"]:
+        spec = GAMES.get(name)
+        if spec and re.search(spec["match"], t):
+            return name
+    return None
 
 # Indices de gros volume quand le titre ne chiffre pas les cartes.
 # Indispensable sur Leboncoin/Vinted où le nombre est dans la description.
@@ -80,8 +110,10 @@ RED_FLAGS = [
     (r"\bnon officiel|\bunofficial\b|\bnot official\b", "non officiel"),
     (r"\bvide\b|\bempty\b", "vide"),
     (r"top.?loaders?|\bemplacements?\b|\brangements?\b|sans (les )?cartes|classeur seul", "contenant vide"),
-    (r"\bcode\s*(carte|card|online|ptcgo|ptcgl)", "cartes code"),
+    (r"\bcode\s*(carte|card|online|ptcgo|ptcgl|arena|mtgo)", "cartes code"),
     (r"\bstickers?\b|\bautocollants?\b|\bcartonnettes?\b", "stickers"),
+    (r"feuilles?\s+(de\s+)?(classeur|protection|rangement)|(protection|rangement)s?\s+(de\s+)?cartes|\bpochettes?\b",
+     "accessoire de rangement"),
 ]
 
 
@@ -101,9 +133,13 @@ def analyse(item, cfg):
     item["total"] = total
     item["price_per_card"] = round(total / count, 4) if (total and count) else None
 
+    game = detect_game(t, cfg)
+    item["game"] = game
+
     gems = []
     score = 0
-    for pat, weight, label in GEM_KEYWORDS:
+    rules = COMMON_GEMS + (GAMES[game]["gems"] if game else [])
+    for pat, weight, label in rules:
         if re.search(pat, t):
             score += weight
             gems.append(label)
@@ -157,9 +193,8 @@ def analyse(item, cfg):
 def passes(item, cfg):
     t = norm(item.get("title", ""))
 
-    required = cfg.get("require_keywords") or []
-    if required and not any(norm(w) in t for w in required):
-        item["_reject"] = "hors sujet (aucun mot requis)"
+    if not item.get("game"):
+        item["_reject"] = "hors sujet (aucun jeu reconnu)"
         return False
 
     for word in cfg.get("exclude_keywords", []):

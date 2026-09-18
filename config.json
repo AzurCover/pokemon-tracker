@@ -13,7 +13,12 @@
       "lot 1000 cartes pokemon",
       "classeur cartes pokemon",
       "lot cartes pokemon anciennes",
-      "lot cartes pokemon vintage"
+      "lot cartes pokemon vintage",
+      "lot cartes magic",
+      "gros lot cartes magic",
+      "vrac cartes magic",
+      "collection cartes magic mtg",
+      "lot cartes magic anciennes"
     ],
     "leboncoin": [
       "lot cartes pokemon",
@@ -21,7 +26,11 @@
       "vrac cartes pokemon",
       "collection cartes pokemon",
       "classeur cartes pokemon",
-      "carton cartes pokemon"
+      "carton cartes pokemon",
+      "lot cartes magic",
+      "vrac cartes magic",
+      "collection cartes magic mtg",
+      "carton cartes magic"
     ]
   },
   "pages": 2,
@@ -47,8 +56,8 @@
   "top_n": 80,
   "notify": true,
   "delay_between_queries": 2.5,
-  "require_keywords": [
+  "games": [
     "pokemon",
-    "pokémon"
+    "magic"
   ]
 }

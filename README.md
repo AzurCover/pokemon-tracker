@@ -1,4 +1,4 @@
-# Tracker multi-sites — gros lots de cartes Pokémon
+# Tracker multi-sites — gros lots de cartes Pokémon & Magic
 
 Sources actives : **eBay** (API) et **Leboncoin** (fonctionne sans clé).
 
@@ -64,7 +64,7 @@ Tout est dans `config.json` :
 |---|---|
 | `sources` | `["ebay", "leboncoin"]` |
 | `queries` | les recherches, par source |
-| `require_keywords` | mots obligatoires dans le titre (évite « Vrac de jouets ») |
+| `games` | jeux surveillés : `["pokemon", "magic"]` — une annonce qui n'en mentionne aucun est écartée |
 | `require_bulk_hint_when_unknown` | sans nombre de cartes, exiger un indice de volume |
 | `min_cards` | nombre de cartes minimum (défaut 100) |
 | `min_total` / `max_total` | fourchette de prix en € (port inclus) |
@@ -102,8 +102,10 @@ une IP résidentielle, donc une machine à la maison.
 
 - **Volume** : +1 à +6 selon le nombre de cartes (1000+ = +5, 2000+ = +6)
 - **Prix/carte** : +6 sous 0,04 € — +4 sous 0,08 € — −3 au-dessus de 0,60 €
-- **Indices de pépite** : Wizards/WOTC +5, 1ère édition +5, 1996-2003 +4,
-  set vintage +4, vintage/ancien +3, grenier/succession +3, gradée +3, holo +2…
+- **Indices de pépite communs** : vintage +3, grenier/succession +3, gradée +3, holo/foil +2
+- **Pépites Pokémon** : Wizards/WOTC +5, 1ère édition +5, 1996-2003 +4, set vintage +4, GX/VMAX +2
+- **Pépites Magic** : liste réservée/duales +6, Alpha/Beta/P9 +6, sets 1993-95 +5,
+  Revised +4, années 90 +4, fetch/shocklands +3
 - **Pénalités** : −4 par signal douteux (contrefaçon, proxy, custom, cartes code, stickers)
 
 Le poids en kg est converti en cartes (~600 cartes/kg) quand le titre annonce « 2 kg de cartes ».
@@ -133,7 +135,7 @@ dans le trieur.
 - `ebay.py` — backend scraping HTML (secours, se fait bloquer)
 - `leboncoin.py` — backend Leboncoin (lit le JSON `__NEXT_DATA__` de la page)
 - `telegram.py` — bot de notification (appairage, envoi photo + lien)
-- `score.py` — extraction du nombre de cartes + scoring
+- `score.py` — détection du jeu, extraction du nombre de cartes, scoring
 - `config.json` — tes filtres
 - `telegram.json` — token du bot + chat_id
 - `seen.json` — historique des annonces déjà vues

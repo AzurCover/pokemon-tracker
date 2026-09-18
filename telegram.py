@@ -67,7 +67,8 @@ def caption(it):
     if tags:
         lines.append(esc(" · ".join(tags[:6])))
 
-    foot = ["score %d" % it.get("score", 0), (it.get("source") or "").upper()]
+    foot = [(it.get("game") or "").upper(), "score %d" % it.get("score", 0),
+            (it.get("source") or "").upper()]
     if it.get("auction"):
         bids = it.get("bids")
         foot.append("enchère%s" % (" · %d mises" % bids if bids else ""))
