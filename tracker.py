@@ -237,10 +237,23 @@ def main():
                     choices=["ebay", "leboncoin"], help="limiter aux sources choisies")
     ap.add_argument("--telegram-setup", action="store_true",
                     help="appairer le bot Telegram puis quitter")
+    ap.add_argument("--telegram-invite", action="store_true",
+                    help="afficher le lien d'invitation à partager")
     args = ap.parse_args()
 
     if args.telegram_setup:
         telegram.setup()
+        return
+
+    if args.telegram_invite:
+        link = telegram.invite_link()
+        if not link:
+            print("Bot non appairé : lance d'abord --telegram-setup")
+            return
+        print("\nLien d'invitation (à envoyer à la personne de ton choix) :\n")
+        print("  %s\n" % link)
+        for cid, who in telegram.recipients():
+            print("  abonné : %s (%s)" % (who, cid))
         return
 
     cfg = load_json(CONFIG, {})
@@ -301,12 +314,17 @@ def main():
     save_json(SEEN, seen)
 
     fresh = [it for it in kept if it["id"] in new_ids]
+    if not args.no_notify and telegram.available():
+        for event in telegram.sync_subscribers():
+            print("Telegram : %s" % event)
+
     if fresh and not args.no_notify:
         if cfg.get("notify", True):
             notify(len(fresh), fresh[0]["title"])
         if telegram.available():
             n = telegram.send_batch(fresh, limit=cfg.get("telegram_max_per_run", 8))
-            print("Telegram : %d annonce(s) envoyée(s)" % n)
+            print("Telegram : %d annonce(s) envoyée(s) à %d destinataire(s)"
+                  % (n, len(telegram.recipients())))
 
     if args.open:
         subprocess.run(["open", REPORT], check=False)

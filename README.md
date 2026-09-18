@@ -56,6 +56,24 @@ prennent le relais du fichier.
 Par passage, seules les 8 meilleures nouveautés partent en message (réglable via
 `telegram_max_per_run`), le reste est résumé en une ligne.
 
+### Partager le bot
+
+```bash
+python3 tracker.py --telegram-invite      # affiche le lien + la liste des abonnés
+```
+
+Le lien contient un code secret (`?start=…`). Qui l'ouvre et appuie sur **Démarrer**
+est abonné au passage suivant du tracker et reçoit ensuite les mêmes annonces que toi.
+Sans ce code, un inconnu qui tombe sur le bot se fait poliment éconduire — le bot est
+public par nature, seul l'abonnement est filtré. `/stop` désabonne.
+
+**Ne partage jamais le token**, seulement ce lien : le token donne le contrôle total
+du bot. S'il fuite, `/revoke` dans @BotFather en génère un nouveau.
+
+L'apparence du bot (nom, description, commandes) est posée par `telegram.describe()`.
+La photo de profil, elle, n'est pas modifiable par l'API : elle passe obligatoirement
+par @BotFather → *Edit Bot* → *Edit Botpic*, avec `bot-logo.png`.
+
 ## 4. Régler les filtres
 
 Tout est dans `config.json` :
