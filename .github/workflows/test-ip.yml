@@ -1,0 +1,30 @@
+name: Test IP datacenter
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Leboncoin depuis un runner GitHub
+        run: |
+          python3 - <<'PY'
+          import urllib.error, leboncoin
+          url = leboncoin.build_url("gros lot cartes pokemon")
+          print("URL:", url)
+          try:
+              page = leboncoin.fetch(url)
+          except urllib.error.HTTPError as exc:
+              print("HTTP %s — bloque" % exc.code)
+              raise SystemExit(1)
+          ads = leboncoin.parse_listings(page)
+          print("HTTP 200 — %d octets, %d annonces parsees" % (len(page), len(ads)))
+          if not ads:
+              print("page recue mais aucune annonce : challenge anti-bot probable")
+              print(page[:600])
+              raise SystemExit(1)
+          for a in ads[:3]:
+              print(" -", a["title"][:70], "|", a["price_text"])
+          PY

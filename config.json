@@ -1,0 +1,54 @@
+{
+  "sources": [
+    "ebay",
+    "leboncoin"
+  ],
+  "site": "www.ebay.fr",
+  "queries": {
+    "ebay": [
+      "lot cartes pokemon",
+      "gros lot cartes pokemon",
+      "vrac cartes pokemon",
+      "collection cartes pokemon",
+      "lot 1000 cartes pokemon",
+      "classeur cartes pokemon",
+      "lot cartes pokemon anciennes",
+      "lot cartes pokemon vintage"
+    ],
+    "leboncoin": [
+      "lot cartes pokemon",
+      "gros lot cartes pokemon",
+      "vrac cartes pokemon",
+      "collection cartes pokemon",
+      "classeur cartes pokemon",
+      "carton cartes pokemon"
+    ]
+  },
+  "pages": 2,
+  "sort": "recent",
+  "location": null,
+  "buy_it_now": false,
+  "min_total": 15,
+  "max_total": 400,
+  "min_cards": 100,
+  "keep_unknown_count": true,
+  "require_bulk_hint_when_unknown": true,
+  "max_price_per_card": 0.5,
+  "min_score": 4,
+  "reject_red_flags": true,
+  "exclude_keywords": [
+    "pokemon go",
+    "peluche",
+    "figurine",
+    "album panini",
+    "sleeves",
+    "protege carte"
+  ],
+  "top_n": 80,
+  "notify": true,
+  "delay_between_queries": 2.5,
+  "require_keywords": [
+    "pokemon",
+    "pokémon"
+  ]
+}
