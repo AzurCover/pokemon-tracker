@@ -11,20 +11,26 @@ jobs:
       - name: Leboncoin depuis un runner GitHub
         run: |
           python3 - <<'PY'
-          import urllib.error, leboncoin
-          url = leboncoin.build_url("gros lot cartes pokemon")
-          print("URL:", url)
-          try:
-              page = leboncoin.fetch(url)
-          except urllib.error.HTTPError as exc:
-              print("HTTP %s — bloque" % exc.code)
-              raise SystemExit(1)
-          ads = leboncoin.parse_listings(page)
-          print("HTTP 200 — %d octets, %d annonces parsees" % (len(page), len(ads)))
-          if not ads:
-              print("page recue mais aucune annonce : challenge anti-bot probable")
-              print(page[:600])
-              raise SystemExit(1)
-          for a in ads[:3]:
-              print(" -", a["title"][:70], "|", a["price_text"])
+          import http.cookiejar, urllib.error, urllib.request
+          import leboncoin
+
+          jar = http.cookiejar.CookieJar()
+          opener = urllib.request.build_opener(
+              urllib.request.HTTPCookieProcessor(jar))
+
+          def get(url):
+              req = urllib.request.Request(url, headers=leboncoin.HEADERS)
+              with opener.open(req, timeout=30) as resp:
+                  return resp.status
+
+          for step, url in [
+              ("accueil", "https://www.leboncoin.fr/"),
+              ("recherche", leboncoin.build_url("gros lot cartes pokemon")),
+          ]:
+              try:
+                  code = get(url)
+                  print("%-10s HTTP %s (%d cookies)" % (step, code, len(jar)))
+              except urllib.error.HTTPError as exc:
+                  print("%-10s HTTP %s -- bloque (%d cookies)"
+                        % (step, exc.code, len(jar)))
           PY
