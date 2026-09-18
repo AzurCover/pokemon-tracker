@@ -79,12 +79,24 @@ Tout est dans `config.json` :
 
 ## 5. Automatiser
 
-Passage toutes les 2 h avec notification macOS :
+**Leboncoin — sur le Mac** (LaunchAgent déjà installé, passage toutes les 10 min) :
 
 ```bash
-crontab -e
-0 */2 * * * cd ~/pokemon-tracker && /usr/bin/python3 tracker.py >> run.log 2>&1
+launchctl list | grep pokemon                     # vérifier qu'il tourne
+tail -f run.log                                   # suivre en direct
+launchctl unload ~/Library/LaunchAgents/com.maxence.pokemon-tracker.plist   # arrêter
 ```
+
+Il n'interroge que 2 recherches larges triées par date, 1 page : sur une simple
+surveillance, des recherches qui se chevauchent n'apportent rien et multiplient
+le risque de blacklist DataDome sur ton IP.
+
+**eBay — sur GitHub Actions** (`.github/workflows/track.yml`), passage toutes les
+10 min, gratuit et 24/7. Les identifiants vivent dans les *secrets* du repo.
+
+Leboncoin **ne peut pas** tourner dans le cloud : DataDome renvoie 403 sur toute IP
+de datacenter, y compris sur la page d'accueil et avec cookies de session. Il faut
+une IP résidentielle, donc une machine à la maison.
 
 ## Comment le score est calculé
 
