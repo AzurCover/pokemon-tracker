@@ -7,6 +7,7 @@ les messages.
 """
 
 import hmac
+import signal
 import sys
 import time
 
@@ -14,6 +15,9 @@ import telegram
 
 MAX_TRIES = 5          # essais de mot de passe avant blocage
 BLOCK_SECONDS = 3600
+
+POLL = 25              # durée du long polling Telegram
+WATCHDOG = POLL + 25   # au-delà, la connexion est considérée comme morte
 
 ASK_PASSWORD = ("Ce bot est privé.\n\nEnvoie-moi le mot de passe pour recevoir "
                 "les annonces.")
@@ -23,6 +27,12 @@ WELCOME = ("<b>C'est bon, tu as accès.</b>\n\n"
            "cartes, indices de pépite et lien direct.\n\n"
            "Choisis ce que tu veux suivre :")
 MENU = "Quels jeux veux-tu suivre ?"
+
+
+def log(msg):
+    # l'heure est le seul indice quand le bot se tait : c'est ce qui distingue
+    # « personne n'a écrit » de « le processus ne lit plus rien »
+    print("%s %s" % (time.strftime("%H:%M:%S"), msg), flush=True)
 
 
 def games_markup(selected):
@@ -40,7 +50,7 @@ def say(token, chat_id, text, markup=None):
     try:
         return telegram.call("sendMessage", payload, token)
     except RuntimeError as exc:
-        print("  ! envoi à %s : %s" % (chat_id, exc), flush=True)
+        log("  ! envoi à %s : %s" % (chat_id, exc))
         return None
 
 
@@ -69,7 +79,7 @@ def handle_message(state, token, msg):
         if sub is not None and cid != str(state.get("chat_id") or ""):
             state["subscribers"] = [s for s in state.get("subscribers") or []
                                     if str(s.get("id")) != cid]
-            print("− %s (%s) s'est désabonné" % (name, cid), flush=True)
+            log("− %s (%s) s'est désabonné" % (name, cid))
         say(token, cid, "Très bien, je n'envoie plus rien. "
                         "<i>/start pour revenir.</i>")
         return
@@ -98,7 +108,7 @@ def handle_message(state, token, msg):
         state.setdefault("subscribers", []).append(
             {"id": cid, "name": name, "games": list(telegram.ALL_GAMES)})
         (state.get("tries") or {}).pop(cid, None)
-        print("+ %s (%s) vient de s'abonner" % (name, cid), flush=True)
+        log("+ %s (%s) vient de s'abonner" % (name, cid))
         # le mot de passe ne traîne pas dans l'historique de la conversation
         try:
             telegram.call("deleteMessage",
@@ -114,7 +124,7 @@ def handle_message(state, token, msg):
         state.setdefault("blocked", {})[cid] = time.time() + BLOCK_SECONDS
         tries.pop(cid, None)
         say(token, cid, "Trop d'essais. Réessaie dans une heure.")
-        print("! %s (%s) bloqué après %d essais" % (name, cid, MAX_TRIES), flush=True)
+        log("! %s (%s) bloqué après %d essais" % (name, cid, MAX_TRIES))
     else:
         say(token, cid, "Mot de passe incorrect.")
 
@@ -126,11 +136,12 @@ def handle_callback(state, token, cb):
     sub = find_sub(state, cid)
 
     def close(text=None):
+        # à répondre dans les secondes qui suivent, sinon le bouton reste à tourner
         try:
             telegram.call("answerCallbackQuery",
                           {"callback_query_id": cb["id"], "text": text or ""}, token)
-        except RuntimeError:
-            pass
+        except RuntimeError as exc:
+            log("  ! answerCallbackQuery : %s" % exc)
 
     if sub is None:
         close("Envoie d'abord le mot de passe.")
@@ -142,13 +153,9 @@ def handle_callback(state, token, cb):
         close()
         labels = " · ".join(telegram.GAME_LABELS[g] for g in telegram.ALL_GAMES
                             if g in games)
-        try:
-            telegram.call("editMessageText", {
-                "chat_id": cid, "message_id": msg_id, "parse_mode": "HTML",
-                "text": "Tu suis : <b>%s</b>\n\n<i>/jeux pour changer.</i>" % labels},
-                token)
-        except RuntimeError:
-            pass
+        edit(token, cid, msg_id, "editMessageText", {
+            "parse_mode": "HTML",
+            "text": "Tu suis : <b>%s</b>\n\n<i>/jeux pour changer.</i>" % labels})
         return
 
     if data.startswith("g:"):
@@ -163,48 +170,71 @@ def handle_callback(state, token, cb):
         sub["games"] = [g for g in telegram.ALL_GAMES if g in games]
         telegram.save_state(state)
         close()
-        try:
-            telegram.call("editMessageReplyMarkup", {
-                "chat_id": cid, "message_id": msg_id,
-                "reply_markup": games_markup(sub["games"])}, token)
-        except RuntimeError:
-            pass
+        log("  %s → %s" % (cid, "+".join(sub["games"])))
+        edit(token, cid, msg_id, "editMessageReplyMarkup",
+             {"reply_markup": games_markup(sub["games"])})
+
+
+def edit(token, chat_id, msg_id, method, extra):
+    payload = {"chat_id": chat_id, "message_id": msg_id}
+    payload.update(extra)
+    try:
+        telegram.call(method, payload, token)
+    except RuntimeError as exc:
+        log("  ! %s : %s" % (method, exc))
+
+
+def wedged(_sig, _frame):
+    """Le Mac s'est endormi : la connexion est morte mais urlopen l'ignore."""
+    raise OSError("aucune réponse de Telegram depuis %d s" % WATCHDOG)
 
 
 def main():
     state = telegram.load_state()
     token = str(state.get("bot_token") or "").strip()
     if not token:
-        print("Bot non appairé : lance d'abord tracker.py --telegram-setup")
+        log("Bot non appairé : lance d'abord tracker.py --telegram-setup")
         return 1
 
     telegram.get_password()        # en crée un au premier démarrage
-    telegram.describe()
-    print("Écoute de Telegram démarrée.", flush=True)
+    try:
+        telegram.describe()
+    except RuntimeError as exc:    # setMyName est limité à quelques appels/jour
+        log("! description du bot : %s" % exc)
+    signal.signal(signal.SIGALRM, wedged)
+    log("Écoute de Telegram démarrée.")
 
     while True:
         state = telegram.load_state()
-        payload = {"timeout": 50, "limit": 20,
+        payload = {"timeout": POLL, "limit": 20,
                    "allowed_updates": ["message", "callback_query"]}
         if state.get("offset"):
             payload["offset"] = state["offset"]
         try:
-            res = telegram.call("getUpdates", payload, token, timeout=70)
+            signal.alarm(WATCHDOG)
+            res = telegram.call("getUpdates", payload, token, timeout=POLL + 15)
         except (RuntimeError, OSError) as exc:
-            print("! getUpdates : %s" % exc, flush=True)
+            log("! getUpdates : %s" % exc)
             time.sleep(10)
             continue
+        finally:
+            signal.alarm(0)
 
         updates = res.get("result") or []
         for upd in updates:
             state["offset"] = upd["update_id"] + 1
+            kind = "message" if upd.get("message") else next(
+                (k for k in upd if k != "update_id"), "?")
+            detail = ((upd.get("message") or {}).get("text")
+                      or (upd.get("callback_query") or {}).get("data") or "")
+            log("> %s %s" % (kind, detail[:40]))
             try:
                 if upd.get("message"):
                     handle_message(state, token, upd["message"])
                 elif upd.get("callback_query"):
                     handle_callback(state, token, upd["callback_query"])
             except Exception as exc:  # noqa: BLE001
-                print("! update %s : %s" % (upd.get("update_id"), exc), flush=True)
+                log("! update %s : %s" % (upd.get("update_id"), exc))
         if updates:
             telegram.save_state(state)
 
