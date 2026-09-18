@@ -197,10 +197,15 @@ def main():
         return 1
 
     telegram.get_password()        # en crée un au premier démarrage
-    try:
-        telegram.describe()
-    except RuntimeError as exc:    # setMyName est limité à quelques appels/jour
-        log("! description du bot : %s" % exc)
+    # Le daemon redémarre à chaque réveil du Mac. Reposer nom et description à
+    # chaque fois ne change rien et finit en 429 : on ne le fait qu'une fois.
+    if state.get("described_token") != token:
+        try:
+            telegram.describe()
+            state["described_token"] = token
+            telegram.save_state(state)
+        except RuntimeError as exc:
+            log("! description du bot : %s" % exc)
     signal.signal(signal.SIGALRM, wedged)
     log("Écoute de Telegram démarrée.")
 
@@ -214,14 +219,18 @@ def main():
         if state.get("offset"):
             payload["offset"] = state["offset"]
         try:
+            # le désarmement doit être au plus près de l'appel : un finally
+            # extérieur ne s'exécuterait qu'après le except, donc l'alarme
+            # pourrait se déclencher pendant les 10 s d'attente et tuer le bot
             signal.alarm(WATCHDOG)
-            res = telegram.call("getUpdates", payload, token, timeout=POLL + 15)
+            try:
+                res = telegram.call("getUpdates", payload, token, timeout=POLL + 15)
+            finally:
+                signal.alarm(0)
         except (RuntimeError, OSError) as exc:
             log("! getUpdates : %s" % exc)
             time.sleep(10)
             continue
-        finally:
-            signal.alarm(0)
 
         updates = res.get("result") or []
         for upd in updates:
