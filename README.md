@@ -74,7 +74,14 @@ ratés, l'importun est ignoré pendant une heure, et le message contenant le mot
 est effacé de la conversation une fois validé.
 
 **Ne partage jamais le token**, seulement le lien : le token donne le contrôle total
-du bot. S'il fuite, `/revoke` dans @BotFather en génère un nouveau.
+du bot. S'il fuite, `/revoke` dans @BotFather en génère un nouveau, puis :
+
+```bash
+python3 tracker.py --telegram-token    # saisie masquée, abonnés conservés
+```
+
+Le bot reprend de lui-même à la minute qui suit : il relit le token à chaque passage.
+N'utilise pas `--telegram-setup` pour ça, il refait tout l'appairage.
 
 Les réponses doivent être immédiates, alors qu'un passage du tracker n'a lieu que
 toutes les 10 minutes : l'écoute vit donc dans un **processus séparé** (`bot.py`,

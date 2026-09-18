@@ -1,5 +1,6 @@
 """Notifications Telegram : un message par nouvelle annonce, photo + bouton."""
 
+import getpass
 import json
 import os
 import secrets
@@ -78,6 +79,30 @@ def set_password(pwd):
     state["password"] = pwd.strip()
     save_state(state)
     return state["password"]
+
+
+def replace_token():
+    """Après un /revoke : seul le token change, les abonnés restent.
+
+    La saisie est masquée pour que le token ne finisse ni à l'écran ni dans
+    l'historique du shell — c'est justement ce qui a motivé le /revoke.
+    """
+    token = getpass.getpass("Colle le nouveau token (saisie invisible) : ").strip()
+    if not token:
+        print("annulé")
+        return False
+    try:
+        me = call("getMe", {}, token)
+    except RuntimeError as exc:
+        print("Token refusé — %s" % exc)
+        return False
+
+    state = load_state()
+    state["bot_token"] = token
+    save_state(state)
+    print("Token remplacé : @%s" % (me.get("result") or {}).get("username", "?"))
+    print("Abonnés, mot de passe et jeux conservés. Le bot reprend seul.")
+    return True
 
 
 def bot_link(token=None):
@@ -257,8 +282,10 @@ def setup():
         print("Aucun message reçu. Relance la commande après avoir écrit au bot.")
         return False
 
-    with open(CREDS, "w", encoding="utf-8") as fh:
-        json.dump({"bot_token": token, "chat_id": chat_id}, fh, indent=1)
+    # on fusionne : réappairer ne doit pas effacer abonnés ni mot de passe
+    state = load_state()
+    state.update({"bot_token": token, "chat_id": chat_id})
+    save_state(state)
     print("\nAppairé avec %s (chat %s) → telegram.json" % (name or "toi", chat_id))
 
     call("sendMessage", {

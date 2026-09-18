@@ -237,6 +237,8 @@ def main():
                     choices=["ebay", "leboncoin"], help="limiter aux sources choisies")
     ap.add_argument("--telegram-setup", action="store_true",
                     help="appairer le bot Telegram puis quitter")
+    ap.add_argument("--telegram-token", action="store_true",
+                    help="remplacer le token après un /revoke (saisie masquée)")
     ap.add_argument("--telegram-share", action="store_true",
                     help="afficher le lien du bot, le mot de passe et les abonnés")
     ap.add_argument("--telegram-password", metavar="MDP",
@@ -245,6 +247,10 @@ def main():
 
     if args.telegram_setup:
         telegram.setup()
+        return
+
+    if args.telegram_token:
+        telegram.replace_token()
         return
 
     if args.telegram_password:

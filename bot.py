@@ -206,6 +206,9 @@ def main():
 
     while True:
         state = telegram.load_state()
+        # relu à chaque tour : après un /revoke, le nouveau token prend le relais
+        # sans avoir à penser à redémarrer le daemon
+        token = str(state.get("bot_token") or token).strip()
         payload = {"timeout": POLL, "limit": 20,
                    "allowed_updates": ["message", "callback_query"]}
         if state.get("offset"):
