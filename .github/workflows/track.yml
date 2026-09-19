@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: "*/10 * * * *"
   workflow_dispatch:
+    inputs:
+      silencieux:
+        description: "Passage muet (amorcer le cache sans notifier)"
+        type: boolean
+        default: false
 
 # Deux passages simultanes se marcheraient sur l'historique des annonces vues.
 concurrency:
@@ -36,4 +41,7 @@ jobs:
             echo "::error::Secrets EBAY_CLIENT_ID / EBAY_CLIENT_SECRET absents."
             exit 1
           fi
-          python3 tracker.py --source ebay --pages 1
+          # Le tout premier passage part d'un cache vide : sans --no-notify il
+          # annoncerait comme neuves des annonces vieilles de plusieurs mois.
+          python3 tracker.py --source ebay --pages 1 \
+            ${{ inputs.silencieux && '--no-notify' || '' }}
