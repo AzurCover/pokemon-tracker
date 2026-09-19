@@ -101,11 +101,40 @@ GAMES = {
 }
 
 
+# « lot 1000 cartes Marvel (no pokemon magic) » : le vendeur cite les jeux qu'il
+# ne vend pas. Le nier est plus sûr que de l'ignorer — un titre qui prend la
+# peine d'exclure un jeu n'en contient pas.
+NEGATION = r"\b(?:no|non|sans|aucun[es]*|pas de|hors|exclus?|except[eé])\b"
+
+
+def _is_a_game_word(word):
+    return any(re.search(spec["match"], word) for spec in GAMES.values())
+
+
+def _is_negated(t, match):
+    """La négation porte-t-elle sur le jeu lui-même ?
+
+    « no pokemon magic » nie les deux jeux ; « aucun double - Magic » ne nie que
+    les doublons. Ce qui tranche, c'est ce qui sépare la négation du nom du jeu :
+    si ce ne sont que d'autres noms de jeux, la négation les couvre tous.
+    """
+    before = re.split(r"[.,;(\[]", t[:match.start()])[-1]
+    negations = list(re.finditer(NEGATION, before))
+    if not negations:
+        return False
+    between = before[negations[-1].end():]
+    words = [w for w in re.split(r"[^\w-]+", between) if w]
+    return all(_is_a_game_word(w) for w in words)
+
+
 def detect_game(t, cfg):
     """Premier jeu suivi que le titre mentionne, et dont il remplit la condition."""
     for name in cfg.get("games") or ["pokemon"]:
         spec = GAMES.get(name)
-        if not spec or not re.search(spec["match"], t):
+        if not spec:
+            continue
+        found = [m for m in re.finditer(spec["match"], t) if not _is_negated(t, m)]
+        if not found:
             continue
         if spec.get("require") and not re.search(spec["require"], t):
             continue
@@ -158,7 +187,7 @@ CONTENT_LINK = (r"\bavec\b|\bcontenant\b|\bcomprenant\b|\bincluant\b|\bplus\b|\b
                 r"rempli|plein|\+|&")
 # décrire l'état ou la rareté des cartes suppose de les avoir : un classeur vide
 # ne se vante pas d'être « holo reverse vintage »
-HAS_CONTENT = (r"\bvracs?\b|\bdoubles?\b|\bcommunes?\b|rempli|plein\b|\bholos?\b|"
+HAS_CONTENT = (r"\bvracs?\b|\bdoubles?\b|\bcommunes?\b|rempli|plein\b|complet|\bholos?\b|"
                r"\breverses?\b|\bbrillantes?\b|\bvintages?\b|\banciennes?\b")
 
 
@@ -168,10 +197,12 @@ def _sells_the_container(t):
         return False          # « classeur rempli de doubles » : c'est du vrac
     if re.search(r"(?:%s)\s+(?:de\s+)?\d[\d\s.,]*\s*(?:cartes?|emplacements?)" % CAPACITY_WORDS, t):
         return True
-    # contenant suivi de près par un nombre, sans mot qui mette les cartes dedans
+    # contenant suivi de près par un nombre, sans mot qui mette les cartes dedans.
+    # 60 caractères : « Classeur Pokémon / One Piece ZIP 360 cartes » en demande
+    # 32 à lui seul, et au-delà de 60 on ne détecte plus rien de nouveau.
     for m in re.finditer(r"(?:%s)\b" % CONTAINER_WORDS, t):
-        gap = t[m.end():m.end() + 24]
-        num = re.match(r"[^,;]{0,20}?(\d[\d\s]*)\s*cartes?\b", gap)
+        gap = t[m.end():m.end() + 60]
+        num = re.match(r"[^,;]{0,56}?(\d[\d\s]*)\s*cartes?\b", gap)
         if num and not re.search(CONTENT_LINK, gap[:num.start(1)]):
             return True
     return False
