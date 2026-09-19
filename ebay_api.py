@@ -196,7 +196,10 @@ def _normalise(node):
     image = ((node.get("image") or {}).get("imageUrl")
              or ((node.get("thumbnailImages") or [{}])[0] or {}).get("imageUrl") or "")
 
-    seller = (node.get("seller") or {}).get("username", "")
+    # Le pseudo du vendeur est volontairement ignoré : c'est la seule donnée
+    # d'utilisateur eBay que l'API nous tende, et ne pas en conserver est la
+    # condition de l'exemption aux notifications de suppression de compte.
+    # Le pays suffit pour juger des frais de port.
     loc = (node.get("itemLocation") or {}).get("country", "")
 
     attrs = []
@@ -221,7 +224,7 @@ def _normalise(node):
         "best_offer": "BEST_OFFER" in buying,
         "sponsored": False,
         "condition": node.get("condition", ""),
-        "subtitle": "%s · %s" % (seller, loc),
+        "subtitle": loc,
         "attrs": " | ".join(attrs),
         "listed": (node.get("itemCreationDate") or "")[:16].replace("T", " "),
         "image": image,
