@@ -10,6 +10,7 @@ import base64
 import getpass
 import json
 import os
+import re
 import stat
 import time
 import urllib.error
@@ -74,8 +75,9 @@ def setup():
     if not cid or not secret:
         print("annulé")
         return False
-    if cid.upper().startswith("SBX-") or "SBX" in cid.upper().split("-")[:2]:
-        print("Ça ressemble à une clé Sandbox (SBX-). Il faut le keyset Production.")
+    problem = _shape_problem(cid, secret)
+    if problem:
+        print("\n%s" % problem)
         return False
 
     previous = None
@@ -89,13 +91,45 @@ def setup():
         if previous is not None:  # on ne laisse pas un fichier cassé derrière soi
             with open(CREDS, "w", encoding="utf-8") as fh:
                 fh.write(previous)
-        print("Clés refusées par eBay — %s" % exc)
+        print("\nClés refusées par eBay — %s" % exc)
+        print("\nLes deux ont la bonne forme, donc c'est ailleurs :")
+        print("  • keyset Production et pas Sandbox (onglet en haut de la page)")
+        print("  • Cert ID complet : il est masqué par défaut, il faut cliquer")
+        print("    dessus pour le révéler avant de copier")
+        print("  • App ID et Cert ID du *même* keyset")
+        print("  • compte tout neuf : les clés Production mettent parfois")
+        print("    quelques minutes à être actives")
         return False
 
     print("\nClés acceptées, eBay est branché.")
     print("credentials.json est en lecture pour toi seul et n'est pas versionné.")
     print("Pour GitHub Actions : python3 tracker.py --ebay-push")
     return True
+
+
+def _shape_problem(cid, secret):
+    """Diagnostic sur la *forme* des clés, sans jamais en afficher le contenu.
+
+    Le keyset eBay aligne trois valeurs : App ID, Dev ID, Cert ID. Le Dev ID est
+    au milieu et ressemble à un secret — c'est lui qu'on colle par erreur, et
+    eBay ne répond alors qu'un « invalid_client » qui n'aide personne.
+    """
+    uuid_like = re.fullmatch(r"[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}",
+                             secret.lower()) is not None
+    if "SBX" in cid.upper() or secret.upper().startswith("SBX-"):
+        return ("Ce sont les clés Sandbox. Il faut le keyset Production "
+                "(l'onglet en haut de https://developer.ebay.com/my/keys).")
+    if uuid_like:
+        return ("Le second est le *Dev ID*, pas le Cert ID : c'est la ligne du "
+                "milieu du keyset, celle qu'on prend pour un secret.\n"
+                "Le Cert ID commence par PRD- et se trouve juste en dessous.")
+    if "-PRD-" not in cid.upper():
+        return ("Le premier ne ressemble pas à un App ID Production : il doit "
+                "contenir -PRD- (forme TonPseudo-nomapp-PRD-xxxx-xxxx).")
+    if not secret.upper().startswith("PRD-"):
+        return ("Le Cert ID Production commence par PRD-. Celui-ci non — "
+                "c'est probablement une autre ligne du keyset.")
+    return None
 
 
 def _write_creds(cid, secret):
