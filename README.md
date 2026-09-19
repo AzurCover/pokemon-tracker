@@ -16,11 +16,17 @@ Le scraping direct des pages eBay fonctionne quelques requêtes puis l'IP est bl
 1. Crée un compte sur https://developer.ebay.com (gratuit).
 2. Va sur https://developer.ebay.com/my/keys
 3. Récupère le **keyset Production** : `App ID (Client ID)` et `Cert ID (Client Secret)`.
-4. Copie-les dans `credentials.json` :
+4. Saisis-les :
 
-```json
-{ "client_id": "TonAppID", "client_secret": "TonCertID" }
+```bash
+python3 tracker.py --ebay-setup    # saisie masquée, vérifiée auprès d'eBay
+python3 tracker.py --ebay-push     # les recopie dans les secrets GitHub
 ```
+
+La saisie est invisible pour que les clés ne restent ni à l'écran ni dans l'historique
+du shell, et elle est validée par un vrai appel OAuth : une clé **Sandbox** collée à la
+place d'une **Production** est refusée tout de suite, au lieu de ne se voir qu'au premier
+passage. Si eBay refuse, le `credentials.json` précédent est remis en place.
 
 Le tracker bascule automatiquement sur l'API dès que le fichier est rempli.
 

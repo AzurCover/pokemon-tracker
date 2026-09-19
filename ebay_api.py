@@ -7,8 +7,10 @@ ou un fichier credentials.json : {"client_id": "...", "client_secret": "..."}
 """
 
 import base64
+import getpass
 import json
 import os
+import stat
 import time
 import urllib.error
 import urllib.parse
@@ -18,7 +20,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 CREDS = os.path.join(HERE, "credentials.json")
 TOKEN_CACHE = os.path.join(HERE, ".token.json")
 
-OAUTH_URL = "https://api.ebay.com/identity/v2/oauth2/token"
+# v1 et pas v2 : /identity/v2/ renvoie 404, l'endpoint OAuth d'eBay n'a jamais
+# changé de version. Le bug est resté invisible tant que credentials.json était
+# vide — get_token() s'arrêtait avant d'appeler l'URL.
+OAUTH_URL = "https://api.ebay.com/identity/v1/oauth2/token"
 SEARCH_URL = "https://api.ebay.com/buy/browse/v1/item_summary/search"
 SCOPE = "https://api.ebay.com/oauth/api_scope"
 
@@ -52,6 +57,53 @@ def get_credentials():
 
 def available():
     return all(get_credentials())
+
+
+def setup():
+    """Saisie masquée des clés Production, puis vérification par un vrai OAuth.
+
+    Masquée parce qu'un App ID collé en clair finit dans l'historique du shell
+    et dans le scrollback du terminal. Et vérifiée tout de suite : une clé
+    Sandbox copiée à la place d'une Production est l'erreur classique, elle ne
+    se voit qu'au premier appel — autant que ce soit maintenant.
+    """
+    print("Clés *Production* sur https://developer.ebay.com/my/keys")
+    print("(App ID = Client ID, Cert ID = Client Secret — rien ne s'affiche)\n")
+    cid = getpass.getpass("App ID (Client ID)     : ").strip()
+    secret = getpass.getpass("Cert ID (Client Secret): ").strip()
+    if not cid or not secret:
+        print("annulé")
+        return False
+    if cid.upper().startswith("SBX-") or "SBX" in cid.upper().split("-")[:2]:
+        print("Ça ressemble à une clé Sandbox (SBX-). Il faut le keyset Production.")
+        return False
+
+    previous = None
+    if os.path.exists(CREDS):
+        with open(CREDS, encoding="utf-8") as fh:
+            previous = fh.read()
+    _write_creds(cid, secret)
+    try:
+        get_token(force=True)
+    except RuntimeError as exc:
+        if previous is not None:  # on ne laisse pas un fichier cassé derrière soi
+            with open(CREDS, "w", encoding="utf-8") as fh:
+                fh.write(previous)
+        print("Clés refusées par eBay — %s" % exc)
+        return False
+
+    print("\nClés acceptées, eBay est branché.")
+    print("credentials.json est en lecture pour toi seul et n'est pas versionné.")
+    print("Pour GitHub Actions : python3 tracker.py --ebay-push")
+    return True
+
+
+def _write_creds(cid, secret):
+    tmp = CREDS + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        json.dump({"client_id": cid, "client_secret": secret}, fh, indent=2)
+    os.chmod(tmp, stat.S_IRUSR | stat.S_IWUSR)   # 0600 : un secret ne se lit pas à plusieurs
+    os.replace(tmp, CREDS)
 
 
 def _post(url, data, headers):

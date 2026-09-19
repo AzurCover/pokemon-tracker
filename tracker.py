@@ -221,6 +221,32 @@ h1 {{ font-size:22px; margin:0 0 4px; }}
         fh.write(doc)
 
 
+def push_ebay_secrets():
+    """Recopie les clés locales dans les secrets GitHub, sans les afficher.
+
+    Elles passent par l'entrée standard de `gh` : rien à l'écran, rien dans
+    l'historique du shell. GitHub Actions en a besoin parce que le workflow
+    tourne sur une machine qui n'a pas ton credentials.json.
+    """
+    cid, secret = ebay_api.get_credentials()
+    if not cid:
+        print("Clés absentes : lance d'abord python3 tracker.py --ebay-setup")
+        return False
+    for name, value in (("EBAY_CLIENT_ID", cid), ("EBAY_CLIENT_SECRET", secret)):
+        try:
+            subprocess.run(["gh", "secret", "set", name], input=value.encode(),
+                           check=True, capture_output=True)
+        except FileNotFoundError:
+            print("gh introuvable — installe GitHub CLI ou colle les secrets à la main")
+            return False
+        except subprocess.CalledProcessError as exc:
+            print("%s : %s" % (name, exc.stderr.decode(errors="replace").strip()))
+            return False
+        print("  %s → poussé" % name)
+    print("GitHub Actions a de quoi interroger eBay au prochain passage.")
+    return True
+
+
 def main():
     ap = argparse.ArgumentParser(description="Tracker eBay — gros lots de cartes Pokémon")
     ap.add_argument("--query", "-q", action="append", help="recherche ad hoc (remplace la config)")
@@ -236,6 +262,10 @@ def main():
     ap.add_argument("--backend", choices=["auto", "api", "scrape"], help="backend eBay")
     ap.add_argument("--source", "-s", action="append",
                     choices=["ebay", "leboncoin"], help="limiter aux sources choisies")
+    ap.add_argument("--ebay-setup", action="store_true",
+                    help="saisir les clés eBay Production (saisie masquée)")
+    ap.add_argument("--ebay-push", action="store_true",
+                    help="copier les clés eBay dans les secrets GitHub")
     ap.add_argument("--telegram-setup", action="store_true",
                     help="appairer le bot Telegram puis quitter")
     ap.add_argument("--telegram-token", action="store_true",
@@ -245,6 +275,14 @@ def main():
     ap.add_argument("--telegram-password", metavar="MDP",
                     help="changer le mot de passe d'accès au bot")
     args = ap.parse_args()
+
+    if args.ebay_setup:
+        ebay_api.setup()
+        return
+
+    if args.ebay_push:
+        push_ebay_secrets()
+        return
 
     if args.telegram_setup:
         telegram.setup()
