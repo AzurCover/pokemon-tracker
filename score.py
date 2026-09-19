@@ -30,15 +30,47 @@ def extract_card_count(title):
     patterns = [
         r"(?:lot|paquet|ensemble|collection|vrac|stock)\s*(?:de|d')?\s*(\d{2,5})(?!\s*/)(?!\s*(?:eur|€|%|ans))",
         r"(\d{2,5})\s*(?:cartes?|cards?)\b",
-        r"\bx\s*(\d{2,5})\b",
+        # (?<![\w-]) et pas \b : sinon le « X2000 » de « Skybox E-X2000 » passe
+        # pour une quantité, le tiret faisant frontière de mot.
+        r"(?<![\w-])x\s*(\d{2,5})\b",
         r"(\d{2,5})\s*(?:pcs?|pieces?)\b",
     ]
     for pat in patterns:
         for m in re.finditer(pat, t):
-            n = int(m.group(1))
-            if 10 <= n <= 50000:
+            n = _quantity(t, m)
+            if n is not None and 10 <= n <= 50000:
                 return n, "titre"
     return None, None
+
+
+def _quantity(t, m):
+    """Le nombre capturé est-il une quantité de cartes — et si oui, laquelle ?
+
+    Deux nombres du vocabulaire des cartes ne comptent rien : le numéro de
+    collection et l'année. Ils se lisent comme des quantités et font passer
+    une carte à l'unité pour un lot de 2000.
+    """
+    n = int(m.group(1))
+
+    # « 59/62 Carte Pokémon » : le dénominateur est la taille du set, jamais ce
+    # qui est en vente. Seule « environ 2000/2500 cartes » est une fourchette —
+    # et une fourchette s'écrit en nombres ronds, là où un numéro de collection
+    # tombe juste (152/203, 101/102). Sur les 35 « A/B cartes » du journal, le
+    # critère isole exactement les 2 fourchettes. On retient la borne basse,
+    # celle qui donne le prix par carte le moins flatteur.
+    frac = re.search(r"(\d{2,5})\s*/\s*$", t[:m.start(1)])
+    if frac:
+        low = int(frac.group(1))
+        fourchette = low >= 100 and low < n and low % 50 == 0 and n % 50 == 0
+        return low if fourchette else None
+
+    # « Promo FR 2026 Carte gradée PCA » : une année. C'est le singulier qui le
+    # dit — sur les 7956 titres du journal, les vrais lots de 2000 écrivent
+    # « cartes », et les six titres en « <année> carte » sont six cartes seules.
+    if 1990 <= n <= 2030 and re.match(r"\s*(?:carte|card)\b", t[m.end(1):]):
+        return None
+
+    return n
 
 
 SEALED = r"\bdisplay\b|\bbooster\b|\bscell[ée]e?s?\b|\bsealed\b|\betb\b|\bcoffret\b"
