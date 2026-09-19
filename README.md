@@ -182,7 +182,11 @@ Le poids en kg est converti en cartes (~600 cartes/kg) quand le titre annonce «
 Sur Leboncoin le titre chiffre rarement les cartes (le nombre est dans la description),
 donc des **indices de volume** prennent le relais : vrac +4, milliers +4, gros lot +3,
 carton/caisse +3, collection entière +3, classeur rempli +3, communes/doubles +2.
-Les contenants vides (top loader, « 252 emplacements ») sont écartés.
+Les contenants vides sont écartés. Un classeur annonce sa contenance exactement
+comme un lot annonce son contenu, et c'est la préposition qui les sépare : « classeur
+**pour** 480 cartes » se vend vide, « boîte **avec** 280 cartes » se vend pleine. Un titre
+qui décrit l'état des cartes (holo, reverse, vintage) parle forcément de cartes réelles
+et reste pris, même s'il commence par « album ».
 
 Le scellé (display, ETB, booster, coffret) **est écarté** : ça ne passe pas dans le
 trieur. Le rejet n'a lieu que si le titre ne chiffre aucune carte, pour qu'un vrai vrac

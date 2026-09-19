@@ -148,6 +148,34 @@ RED_FLAGS = [
 ACCESSORY_BRAND = r"\bultra ?pro\b|\bdragon ?shield\b|\bgamegenic\b|\bultimate ?guard\b|\bexacompta\b"
 CONTAINER = r"\bclasseurs?\b|\bbinders?\b|\bportfolios?\b|\balbums?\b|\bpochettes?\b|\bsleeves?\b|\bboites?\b"
 
+# Un classeur annonce sa contenance en cartes, exactement comme un lot annonce
+# son contenu. Ce qui les sépare, c'est la préposition : « classeur POUR 480
+# cartes » se vend vide, « boîte AVEC 280 cartes » se vend pleine.
+CAPACITY_WORDS = r"pour|pouvant\s+contenir|peut\s+contenir|capacit[ée]|contenance|accueille|jusqu'?[aà]"
+CONTAINER_WORDS = r"classeurs?|binders?|portfolios?|albums?|bo[iîî]tes?|rangements?"
+# ce qui, entre le contenant et le nombre, dit que les cartes sont dedans
+CONTENT_LINK = (r"\bavec\b|\bcontenant\b|\bcomprenant\b|\bincluant\b|\bplus\b|\bet\b|"
+                r"rempli|plein|\+|&")
+# décrire l'état ou la rareté des cartes suppose de les avoir : un classeur vide
+# ne se vante pas d'être « holo reverse vintage »
+HAS_CONTENT = (r"\bvracs?\b|\bdoubles?\b|\bcommunes?\b|rempli|plein\b|\bholos?\b|"
+               r"\breverses?\b|\bbrillantes?\b|\bvintages?\b|\banciennes?\b")
+
+
+def _sells_the_container(t):
+    """Le nombre de cartes du titre est-il une contenance plutôt qu'un contenu ?"""
+    if re.search(HAS_CONTENT, t):
+        return False          # « classeur rempli de doubles » : c'est du vrac
+    if re.search(r"(?:%s)\s+(?:de\s+)?\d[\d\s.,]*\s*(?:cartes?|emplacements?)" % CAPACITY_WORDS, t):
+        return True
+    # contenant suivi de près par un nombre, sans mot qui mette les cartes dedans
+    for m in re.finditer(r"(?:%s)\b" % CONTAINER_WORDS, t):
+        gap = t[m.end():m.end() + 24]
+        num = re.match(r"[^,;]{0,20}?(\d[\d\s]*)\s*cartes?\b", gap)
+        if num and not re.search(CONTENT_LINK, gap[:num.start(1)]):
+            return True
+    return False
+
 
 def analyse(item, cfg):
     title = item.get("title", "")
@@ -197,6 +225,8 @@ def analyse(item, cfg):
     if (re.search(ACCESSORY_BRAND, t) and re.search(CONTAINER, t)
             and not re.search(r"\bvracs?\b|\bdoubles?\b|\bcommunes?\b", t)):
         flags.append("classeur de marque (contenant)")
+    elif _sells_the_container(t):
+        flags.append("contenance, pas contenu")
 
     # bonus volume
     if count:
